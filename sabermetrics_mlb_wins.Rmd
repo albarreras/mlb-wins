@@ -1,0 +1,601 @@
+---
+title: "Astrid Barreras"
+output: 
+  html_document:
+    theme: journal
+    toc: yes
+    toc_float:
+      collapsed: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load libraries
+
+```{r}
+library(dplyr)
+library(Lahman)
+library(ggplot2)
+library(reshape2)
+library(corrplot)
+library(knitr)
+library(tidyverse)
+library(caret)
+```
+
+## Read in Data
+
+I am using Teams data from the Lahman R package. Documentation for this dataset can be found [in Lahmans website](https://www.dropbox.com/scl/fi/9i2nhlskvfkqy7mbuqem7/readme2023.txt?rlkey=odnwx7ujztm0z4ob8dmggfcr0&dl=0).
+
+```{r}
+# Load datasets from package
+data(package = "Lahman")
+
+```
+
+```{r}
+# Load Teams dataset 
+data("Teams") 
+```
+
+```{r}
+# Create a data frame with the column names and descriptions 
+data_description <- data.frame(
+  teams_col = c("yearID", "lgID", "teamID", "franchID", "divID", "Rank", "G", "GHome", "W", "L",
+             "DivWin", "WCWin", "LgWin", "WSWin", "R", "AB", "H", "2B", "3B", "HR", "BB", "SO",
+             "SB", "CS", "HBP", "SF", "RA", "ER", "ERA", "CG", "SHO", "SV", "IPOuts", "HA", "HRA",
+             "BBA", "SOA", "E", "DP", "FP", "name", "park", "attendance", "BPF", "PPF", "teamIDBR",
+             "teamIDlahman45", "teamIDretro"),
+  col_des = c("Year", "League", "Team", "Franchise (links to TeamsFranchise table)", 
+                  "Team's division", "Position in final standings", "Games played", 
+                  "Games played at home", "Wins", "Losses", "Division Winner (Y or N)", 
+                  "Wild Card Winner (Y or N)", "League Champion (Y or N)", 
+                  "World Series Winner (Y or N)", "Runs scored", "At bats", "Hits by batters", 
+                  "Doubles", "Triples", "Home runs by batters", "Walks by batters", 
+                  "Strikeouts by batters", "Stolen bases", "Caught stealing", "Batters hit by pitch", 
+                  "Sacrifice flies", "Opponents runs scored", "Earned runs allowed", 
+                  "Earned run average", "Complete games", "Shutouts", "Saves", 
+                  "Outs Pitched (innings pitched x 3)", "Hits allowed", "Home runs allowed", 
+                  "Walks allowed", "Strikeouts by pitchers", "Errors", "Double Plays", 
+                  "Fielding percentage", "Team's full name", "Name of team's home ballpark", 
+                  "Home attendance total", "Three-year park factor for batters", 
+                  "Three-year park factor for pitchers", "Team ID used by Baseball Reference website", 
+                  "Team ID used in Lahman database version 4.5", "Team ID used by Retrosheet")
+)
+
+# Display the table 
+kable(data_description, col.names = c("Column", "Description"), caption = "TEAMS Data Description")
+
+```
+
+# View of the Data
+
+```{r}
+# Show the first 6 rows of the dataset
+head(Teams)
+```
+
+```{r}
+# Show structure of the dataset
+str(Teams)
+```
+
+All variables in the dataset are set to their appropriate data types.
+
+# Missing Values
+
+```{r}
+# Get columns with missing values and their percentage of missing data
+missing_data <- colMeans(is.na(Teams)) * 100
+missing_data<- missing_data[missing_data > 0]
+
+# Display the results
+print(missing_data)
+
+```
+
+```{r}
+# Deleting columns with > 50% missing data 
+Teams <- Teams %>% select(-divID, -SF, - DivWin, -WCWin)
+
+```
+
+Columns divId, SF, DivWin, and WCWin were deleted as they contained more than 50% missing data. SF (sacrifice flies) began being tracked in 1954 and has undergone some statistical changes over the years. Given, imputation would not be a viable method to handle the missing values in this column. divID can be ignored as it was implemented in 1969 as teams were divided into East and West. DivWin was implemented in 1969 when divisions were first introduced. WCWin was implemented in 1995 when the playoff format was restructured, and has undergone further restructing in 2012 and 2022. Missing values for divID, DivWin, and WCWin should not be imputed as it would cause inaccuracy in data, given the leagues changes.
+
+```{r}
+# Checking to see if the above columns were deleted 
+names(Teams)
+```
+
+Columns were successfully deleted.
+
+```{r}
+# Visualize distribution of Games played at home (GHome)
+hist(Teams$Ghome, main = "Distribution of Games Played at Home", xlab = "GHome", col = "skyblue")
+```
+
+The bar graph above for the distribution of GHome illustrates a distribution skewed to the right.
+
+```{r}
+# Imputation of Ghome missing data with median
+Teams$Ghome[is.na(Teams$Ghome)] <- median(Teams$Ghome, na.rm = TRUE)
+
+```
+
+Imputation of Ghome is done with the median since the data distribution is skewed to the right and since the number of home games is typically consistent from season to season, team to team.
+
+```{r}
+# Check if column has any missing values
+any(is.na(Teams$Ghome))
+```
+
+This shows that the imputation method worked.
+
+```{r}
+# Subset rows with missing LgWin values
+missing_lgwin <- Teams[is.na(Teams$LgWin), ]
+
+# View the subset
+print(missing_lgwin)
+
+
+```
+
+Missing data for LgWin is only associated with 1994. In 1994, MLB players went on strike and it cut the season short.
+
+```{r}
+# Imputation of LgWin missing data with "N"
+Teams$LgWin[is.na(Teams$LgWin)] <- "N"
+
+```
+
+Imputation of LgWin's missing values is done with "N" given the unique historical context, as there were no league winners that year.
+
+```{r}
+# Check if column has any missing values
+any(is.na(Teams$LgWin))
+```
+
+This shows that the imputation method worked.
+
+```{r}
+# Subset rows with missing WSWin values
+missing_wsw <- Teams[is.na(Teams$WSWin), ]
+
+# Count missing WSWin by yearID in table form
+table(missing_wsw$yearID)
+```
+
+Missing data for WSWin is associated with some historical context. First, WSWin was not tracked before 1903 since World Series was not yet established. Second, no World Series was held in 1904 due to disputes between the leagues. Third, in 1994, MLB players went on strike and no World Series was held. Lastly, data missing for 1914 and 1915 could be due to inconsistencies in data tracking.
+
+```{r}
+# Imputation of WSWin's missing data with "N"
+Teams$WSWin[is.na(Teams$WSWin) & Teams$yearID < 1903] <- "N"
+Teams$WSWin[is.na(Teams$WSWin) & Teams$yearID == 1904] <- "N"
+Teams$WSWin[is.na(Teams$WSWin) & Teams$yearID == 1994] <- "N"
+Teams$WSWin[is.na(Teams$WSWin) & Teams$yearID %in% c(1914, 1915)] <- "N"
+```
+
+Imputation of missing values is done with "N" given the historical context described above.
+
+```{r}
+# Check if column has any missing values
+any(is.na(Teams$WSWin))
+```
+
+This shows that the imputation method worked.
+
+```{r}
+# Subset rows with missing SO values
+missing_so <- Teams[is.na(Teams$SO), ]
+
+# Count missing SO by yearID in table form
+table(missing_so$yearID)
+```
+
+There are only two years with missing values for SO, this could be due to inconsistencies in tracking the data.
+
+```{r}
+# Histogram to check the distribution of SO
+hist(Teams$SO, main = "Distribution of SO (Strikeouts)", xlab = "Strikeouts (SO)", col = "lightblue", breaks = 20)
+```
+
+The distribution of SO is roughly normally distributed so the best imputation method is mean.
+
+```{r}
+# Imputation of missing SO values with the mean SO for 1911 and 1912 
+Teams$SO[is.na(Teams$SO) & Teams$yearID == 1911] <- mean(Teams$SO[Teams$yearID == 1911], na.rm = TRUE)
+Teams$SO[is.na(Teams$SO) & Teams$yearID == 1912] <- mean(Teams$SO[Teams$yearID == 1912], na.rm = TRUE)
+```
+
+Imputation of missing data is done with the mean given that the data is roughly normally distributed.
+
+```{r}
+# Check if column has any missing values
+any(is.na(Teams$SO))
+```
+
+This shows that the imputation method worked.
+
+```{r}
+
+# Subset rows with missing park values
+missing_park <- Teams[is.na(Teams$park), ]
+
+# Count missing park by yearID
+table(missing_park$yearID)
+
+```
+
+Missing data for park could be due to inconsistencies in tracking the data point.
+
+```{r}
+# Imputation of missing park values with "Unknown"
+Teams$park[is.na(Teams$park)] <- "Unknown"
+
+```
+
+Since the parks are unknown, imputation is done with "unknown".
+
+```{r}
+# Check if column has any missing values
+any(is.na(Teams$park))
+```
+
+This shows that the imputation method worked.
+
+```{r}
+# Subset rows with missing SB values
+missing_sb <- Teams[is.na(Teams$SB), ]
+
+# Count missing SB by yearID
+table(missing_sb$yearID)
+```
+
+SB missing data is associated with years prior to 1886, which is consistent with when MLB began tracking SB.
+
+```{r}
+# Filter dataset to include only years < 1886
+Teams_SB <- Teams[!(Teams$yearID < 1886 & is.na(Teams$SB)), ]
+
+```
+
+The best method is to filter out the NA values in SB, since imputation with 0, mean, median, or mode would produce inaccurate data. This was saved to a new df so that the Teams df could continue to be analyzed. A complete update to Teams df will be made at the end.
+
+```{r}
+# Subset rows with missing attendance values
+missing_att <- Teams[is.na(Teams$attendance), ]
+
+# Count missing attendance by yearID
+table(missing_att$yearID)
+```
+
+Missing values for attendance is consistent with when MLB began tracking attendance more accurately, where before 1891, it was not. Interesting enough 1914 and 1915 are years with missing values and could be due to inconsistencies in data tracking.
+
+```{r}
+# Filter dataset to exclude rows with missing attendance in years < 1892, 1914, and 1915
+Teams_attendance <- Teams[!(Teams$yearID < 1892 & is.na(Teams$attendance)) & 
+                                !(Teams$yearID %in% c(1914, 1915) & is.na(Teams$attendance)), ]
+
+
+```
+
+Excluding the years with inconsistent data instead of imputation with 0, mean, median, or mode since the latter would produce inaccurate data. This was saved to a new df so that the Teams df could continue to be analyzed. A complete update to Teams df will be made at the end.
+
+```{r}
+# Subset rows with missing CS values
+missing_cs <- Teams[is.na(Teams$CS), ]
+
+# Count missing CS by yearID
+table(missing_cs$yearID)
+```
+
+CS missing data is associated with years prior to 1951, which is consistent with when MLB began tracking CS.
+
+```{r}
+# Filter out rows where CS is NA
+Teams_CS <- Teams %>% filter(!is.na(CS))
+```
+
+The best method is to filter out the NA values in CS, since imputation with 0, mean, median, or mode would produce inaccurate data. This was saved to a new df so that the Teams df could continue to be analyzed. A complete update to Teams df will be made at the end.
+
+```{r}
+# Subset rows with missing HBP values
+missing_hbp <- Teams[is.na(Teams$HBP), ]
+
+# Count missing HBP by yearID
+table(missing_hbp$yearID)
+```
+
+HBP missing data is associated with years prior to 1970, which is consistent with when MLB began tracking HBP.
+
+```{r}
+# Filter out rows where HBP is NA
+Teams_HBP <- Teams %>% filter(!is.na(HBP))
+```
+
+The best method is to filter out the NA values in HBP, since imputation with 0, mean, median, or mode would produce accurate data. This was saved to a new df so that the Teams df could continue to be analyzed. A complete update to Teams df will be made at the end.
+
+```{r}
+# Create a dataset with all filters above
+Teams_filtered <- Teams %>%
+  filter(!(yearID < 1892 & is.na(attendance)) &                    
+         !(yearID %in% c(1914, 1915) & is.na(attendance)) &        
+         !(yearID < 1886 & is.na(SB)) &                            
+         !is.na(CS) &                                              
+         !is.na(HBP))                                              
+
+```
+
+```{r}
+# Check if column has any missing values
+any(is.na(Teams_filtered))
+
+```
+
+All the removing of columns, excluding of missing values and imputations worked.
+
+```{r}
+summary(Teams_filtered)
+```
+
+# Feature Engineering
+
+```{r}
+# Creating a column to hold the values for run differential
+Teams_filtered$run_differential <- Teams_filtered$R - Teams_filtered$RA
+```
+
+Run differential is calculated by subtracting runs allowed from runs scored. Run differential is evaluated as positive if a team scores more runs than it allows and negative if a team allows more runs than it scores. This calculation can be used to predict the expected win total for a team.
+
+```{r}
+# Creating a column to hold the values for winning percentage
+Teams_filtered$winning_percentage <- Teams_filtered$W / Teams_filtered$G
+```
+
+In order to compare teams expected winning percentage to the actual winning percentage, the winning percentage was calculated by dividing the number of games played by number of games won.
+
+```{r}
+# Creating a column to hold the values for Pythagorean expectation
+Teams_filtered$pythagorean_expectation <- Teams_filtered$R^1.83 / (Teams_filtered$R^1.83 + Teams_filtered$RA^1.83)
+```
+
+Created by Bill James in order to evaluate a teams performance by comparing the expected winning percentage to the actual winning percentage. This can be calculated using the formula below: (Runs Scored¹.83)/((Runs Scored¹.83)+ (Runs Allowed¹.83))
+
+```{r}
+# Creating a column to hold the values for under/over performance 
+Teams_filtered$performance <- ifelse(Teams_filtered$winning_percentage > Teams_filtered$pythagorean_expectation, 
+                            "Overperformed", "Underperformed")
+
+
+```
+
+Comparison of expected winning percentage to the actual winning percentage can be done by classifying teams as over or under performing. Teams who overperformed are determined if their winning percentage is higher than the Pythagorean expectation (expected winning percentage). Teams who underperformed are determined if their winning percentage is lower than the Pythagorean expectation (expected winning percentage).
+
+```{r}
+# Creating a column to hold the values for historical success based on World Series or league wins
+Teams_filtered$historical_success <- ifelse(Teams_filtered$WSWin == "Y", "Champion",
+                                    ifelse(Teams_filtered$LgWin == "Y", "League Winner", "Non-Winner"))
+
+```
+
+Historical success feature was created to delineate Champions, for winning the World Series, League Winner, for winning the league by not World Series, and Non-Winner, for teams who did not win either. The purpose of the feature is to analyze success levels across teams by categorizing them, for comparison of other variables such as RS or ERA to see what differences lie between levels, and this could support the predictive model to be developed in the next part of the assignment.
+
+Print the data types of each column (e.g., use the ‘str() function in RStudio).
+
+```{r}
+str(Teams_filtered)
+```
+
+Show summary of the columns (e.g., use the ‘summary()’ function in RStudio).
+
+```{r}
+summary(Teams_filtered)
+```
+
+# Exploratory Analysis
+
+Identifying which model to use by visualizing linear relationships.
+
+```{r}
+# Create an object to hold offensive performance variables with Wins
+offensive_vars <- Teams_filtered[, c("W", "R", "HR", "BB", "H", "SB")]
+```
+
+```{r}
+# Calculate correlation matrices
+cor_offensive <- cor(offensive_vars, use = "complete.obs")
+```
+
+```{r}
+# Create correlation plot for Offensive Performance Variables
+corrplot(cor_offensive, method = "color", type = "upper",
+         tl.col = "black", tl.srt = 45,
+         addCoef.col = "black", number.cex = 0.7,
+         title = "Correlation of Offensive Variables with Wins", 
+         mar = c(0, 0, 1, 0))
+```
+
+The correlation matrix above illustrates the offensive variables correlated with Wins. The variables most associated with wins are: R - runs scored (0.72), H - hits (0.67), and BB - walks (0.63).
+
+```{r}
+# Create object to hold defensive and pitching variables with Wins
+defensive_vars <- Teams_filtered[, c("W", "RA", "ERA", "SOA", "SV", "FP")]
+```
+
+```{r}
+# Calculate correlation matrices
+cor_defensive <- cor(defensive_vars, use = "complete.obs")
+
+```
+
+```{r}
+# Create correlation plot for Defensive and Pitching Variables
+corrplot(cor_defensive, method = "color", type = "upper",
+         tl.col = "black", tl.srt = 45,
+         addCoef.col = "black", number.cex = 0.7,
+         title = "Correlation of Defensive and Pitching Variables with Wins", 
+         mar = c(0, 0, 1, 0))
+```
+
+The correlation matrix above illustrates the defensive variables correlated with Wins. The variables most associated with wins are: SOA - strikeouts by pitchers (0.40) and SV - saves (0.64). These are all variables that will be taken into account for developing the predictive model for MLB wins for Part 2.Surprisingly, RA - runs allowed, has a very low correlation (0.03) with runs and negatively correlated with ERA (-0.47).
+
+```{r}
+# Convert 'performance' and 'historical_success' to numeric 
+Teams_filtered$performance_numeric <- ifelse(Teams_filtered$performance == "Overperformed", 1, 0)
+Teams_filtered$historical_success <- ifelse(Teams_filtered$WSWin == "Y", "Champion",
+                                    ifelse(Teams_filtered$LgWin == "Y", "League Winner", "Non-Winner"))
+
+# Convert historical_success to numeric encoding
+Teams_filtered$historical_success_numeric <- ifelse(Teams_filtered$historical_success == "Champion", 2,
+                                           ifelse(Teams_filtered$historical_success == "League Winner", 1, 0))
+
+```
+
+```{r}
+# Subset data with Wins and feature-engineered variables
+feature_vars <- Teams_filtered[, c("W", "run_differential", "winning_percentage", 
+                                    "pythagorean_expectation", "performance_numeric", 
+                                    "historical_success_numeric")]
+
+
+```
+
+```{r}
+# Calculate correlation matrix with Wins included
+cor_matrix <- cor(feature_vars, use = "complete.obs")
+
+```
+
+```{r}
+# Create a plot the correlation matrix
+corrplot(cor_matrix, method = "color", type = "upper", 
+         tl.col = "black", tl.srt = 45,
+         addCoef.col = "black", number.cex = 0.7,
+         title = "Correlation of Feature-Engineered Variables with Wins", 
+         mar = c(0, 0, 1, 0))
+```
+
+The correlation matrix above illustrates the feature engineered variables correlated with Wins. The variables most associated with wins are: run differential (0.75), winning percentage (0.79), and pythagorean expectation (0.74). These are all variables that will be taken into account for developing the predictive model for MLB wins.
+
+# Correlation Matrix of Selected Variables
+
+```{r}
+correlated_vars_w <- cor(Teams_filtered %>% 
+                           select(W, R, H, BB, SV, SOA, 
+                                  run_differential, 
+                                  winning_percentage,
+                                  pythagorean_expectation, 
+                                  ))
+
+corrplot(correlated_vars_w, method = "color", type = "upper", 
+         tl.col = "black", tl.srt = 45,
+         addCoef.col = "black", number.cex = 0.7,
+         title = "Correlation of Variables with Wins", 
+         mar = c(0, 0, 1, 0))
+```
+
+# Train/Test
+
+Spliting the data into train and test datasets.
+
+```{r}
+# Set seed for reproducibility
+set.seed(123)
+
+# Split data into training (80%) and testing (20%) sets
+split_index <- createDataPartition(Teams_filtered$W, p = 0.8, list = FALSE)
+train_data <- Teams_filtered[split_index, ]
+test_data <- Teams_filtered[-split_index, ]
+
+```
+
+# Linear Regression
+
+```{r}
+# Fit the model
+linear_model <- lm(W ~ R+ H+ BB+ SV+ 
+                     SOA+ run_differential+ 
+                     winning_percentage+ 
+                     pythagorean_expectation, 
+                   data = train_data)
+
+# Summarize the model
+summary(linear_model)
+
+```
+
+```{r}
+# Predict Wins on the test data
+predictions <- predict(linear_model, newdata = test_data)
+
+```
+
+```{r}
+# Calculate performance metrics
+actual <- test_data$W
+mae <- mean(abs(predictions - actual))  # Mean Absolute Error
+rmse <- sqrt(mean((predictions - actual)^2))  # Root Mean Squared Error
+r_squared <- 1 - (sum((predictions - actual)^2) / sum((actual - mean(actual))^2))  # R²
+
+# Print metrics
+cat("MAE:", mae, "\n")
+cat("RMSE:", rmse, "\n")
+cat("R-squared:", r_squared, "\n")
+
+```
+
+```{r}
+# Create a scatter plot
+ggplot(data = NULL, aes(x = actual, y = predictions)) +
+  geom_point(color = "blue") +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+  labs(title = "Actual vs Predicted Wins",
+       x = "Actual Wins",
+       y = "Predicted Wins") +
+  theme_minimal()
+
+```
+
+```{r}
+# Residuals vs Fitted plot
+plot(linear_model, which = 1)
+
+# Q-Q plot to check normality
+plot(linear_model, which = 2)
+
+```
+
+```{r}
+# Cross-validation to validate robustness
+train_control <- trainControl(method = "cv", number = 10)
+cv_model <- train(W ~ R+ H+ BB+ SV+ 
+                     SOA+ run_differential+ 
+                     winning_percentage+ 
+                     pythagorean_expectation,
+                  data = train_data, method = "lm", trControl = train_control)
+print(cv_model)
+
+```
+
+# Model Performance Summary Report
+
+The goal of this assignment is to solve a problem by using one of the supervised or unsupervised machine learning algorithms taught in this course: Linear Regression, Logistic Regression, Decision Tree, K-Nearest Neighbor, K-Means Clustering, or DBSCAN.
+
+The problem identified for this dataset early on was to predict MLB wins, which is a continuous numeric target variable. Therefore, the problem attempting to be solved is that of regression. Based on the machine learning algorithms taught in this course, several algorithms can be considered such as: Linear Regression, Decision Tree, or K-Nearest Neighbor. Which algorithm will be used can be derived from insights from exploratory data analysis (performed below) to identify linear relationships with the target variable, `wins`. The goal from identifying linear relationships is to highlight the variables that correlate with `wins` to be used in the predictive model.
+
+The linear regression model's R-squared is 0.9576, very close to 1, indicating that almost 96% of the variance in wins is explained by the model, that is the predictive variables R+ H+ BB+ SV+ SOA+ run_differential+ winning_percentage+ pythagorean_expectation).
+
+The linear regression model's MAE (mean absolute error) is 2.33, indicating that on average the predictions only deviate 2.33 games from the actual wins, highlighting the accuracy of the model due to its low error rate.
+
+The linear regression model's RMSE (root mean squared error) is 2.85, indicating that on average the predictions only deviate 2.33 games from the actual wins, highlighting the accuracy of the model due to its low error rate. RMSE penalized larger errors than MAE, which accounts for the larger RMSE compared to MAE.
+
+Overall, the linear model is an excellent fit for predicting MLB wins.
+
+```{r}
+# Save the model
+saveRDS(linear_model, file = "mlb_wins_model.rds")
+
+```
