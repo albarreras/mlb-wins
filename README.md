@@ -35,8 +35,8 @@ The analysis explores how variables such as **run differential**, **team offense
 
     ```bash
     install.packages(c(
-      "Lahman", "tidyverse", "janitor", "caret", "broom",
-      "yardstick", "GGally", "gt", "patchwork"
+      "Lahman", "tidyverse", "corrplot", "caret", "dplyr",
+    "reshape2", "knitr"
     ))
 
 3. Render the Quarto document
