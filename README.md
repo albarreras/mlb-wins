@@ -47,7 +47,7 @@ This will output an .html (and optionally .pdf) report showing:
 
 - Linear regression model (LM)
 
-- Cross-validation metrics (R², RMSE, MAE)
+- Validation metrics (R², RMSE, MAE)
 
 - Diagnostic plots
 
