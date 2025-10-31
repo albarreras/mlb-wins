@@ -1,7 +1,7 @@
 #  MLB Wins Prediction (Lahman Dataset)
 
 **Author:** Astrid Barreras  
-**Stack:** R, Quarto, Lahman, tidyverse, ggplot2, caret  
+**Stack:** R, Lahman, tidyverse, ggplot2, caret  
 **Last Updated:** November 2024  
 
 ---
@@ -27,19 +27,16 @@ The analysis explores how variables such as **run differential**, **team offense
 ##  How to Run the Quarto Document
 
 1. Clone this repo
-   ```bash
+   ```
    git clone https://github.com/albarreras/mlb-wins.git
    cd mlb-wins
    
-2. Open in RStudio (recommended) or run in terminal. Install required packages
+2. Open in RStudio. 
 
-    ```bash
-    install.packages(c("Lahman", "tidyverse", "corrplot", "caret", "dplyr", "reshape2", "knitr"))
+3. Render the Quarto document.
 
-3. Render the Quarto document
-
-    ```bash
-    quarto::quarto_render("mlb-wins-prediction.qmd")
+    ```
+    quarto::quarto_render("sabermetrics_mlb_wins.Rmd")
 
 
 This will output an .html (and optionally .pdf) report showing:
