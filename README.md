@@ -20,7 +20,7 @@ The analysis explores how variables such as **run differential**, **team offense
 | File | Description |
 |------|--------------|
 | `sabermetrics_mlb_wins.Rmd` | Main Quarto document. Can be rendered to HTML or PDF. Contains code, visuals, and analysis. |
-| `sabermetrics_mlb_wins.pdf` | Pre-rendered report for quick viewing (no setup required). |
+| `sabermetrics_mlb_wins.pdf` | Pre-rendered report for quick viewing. |
 
 ---
 
