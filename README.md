@@ -34,10 +34,7 @@ The analysis explores how variables such as **run differential**, **team offense
 2. Open in RStudio (recommended) or run in terminal. Install required packages
 
     ```bash
-    install.packages(c(
-      "Lahman", "tidyverse", "corrplot", "caret", "dplyr",
-    "reshape2", "knitr"
-    ))
+    install.packages(c("Lahman", "tidyverse", "corrplot", "caret", "dplyr", "reshape2", "knitr"))
 
 3. Render the Quarto document
 
